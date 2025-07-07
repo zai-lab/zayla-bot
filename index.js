@@ -1,50 +1,56 @@
-const { default: makeWASocket, useSingleFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
-const { Boom } = require('@hapi/boom');
-const qrcode = require('qrcode-terminal');
-const fs = require('fs');
+const { default: makeWASocket, useSingleFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
+const { Boom } = require("@hapi/boom");
+const qrcode = require("qrcode-terminal");
+const express = require("express");
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-// Lokasi file auth
-const { state, saveState } = useSingleFileAuthState('./session.json');
+const { state, saveState } = useSingleFileAuthState('./auth_info.json');
 
-async function startZaylaBot() {
-    const sock = makeWASocket({
-        auth: state,
-        printQRInTerminal: false, // ini dimatikan karena kita handle sendiri QR-nya
-    });
+async function startBot() {
+  const sock = makeWASocket({
+    auth: state,
+    printQRInTerminal: true
+  });
 
-    // Menyimpan sesi
-    sock.ev.on('creds.update', saveState);
+  sock.ev.on('creds.update', saveState);
 
-    // Tampilkan QR code
-    sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
-        if (qr) {
-            console.log('[🤖] Scan QR di bawah ini untuk login:');
-            qrcode.generate(qr, { small: true });
-        }
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect } = update;
+    if (connection === 'close') {
+      const shouldReconnect = (lastDisconnect.error = Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
+      if (shouldReconnect) {
+        startBot();
+      }
+    } else if (connection === 'open') {
+      console.log('✅ Bot berhasil tersambung ke WhatsApp');
+    }
+  });
 
-        if (connection === 'close') {
-            const shouldReconnect = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Koneksi terputus. Reconnect?', shouldReconnect);
-            if (shouldReconnect) {
-                startZaylaBot();
-            }
-        } else if (connection === 'open') {
-            console.log('✅ Bot berhasil terhubung ke WhatsApp!');
-        }
-    });
+  sock.ev.on('messages.upsert', async ({ messages }) => {
+    const msg = messages[0];
+    if (!msg.message || msg.key.fromMe) return;
+    
+    const from = msg.key.remoteJid;
+    const body = msg.message.conversation || msg.message.extendedTextMessage?.text;
 
-    // Respon pesan
-    sock.ev.on('messages.upsert', async ({ messages, type }) => {
-        const msg = messages[0];
-        if (!msg.message) return;
+    if (body === '!ping') {
+      await sock.sendMessage(from, { text: '🏓 Pong!' });
+    }
 
-        const from = msg.key.remoteJid;
-        const text = msg.message.conversation || msg.message.extendedTextMessage?.text;
-
-        if (text === '!ping') {
-            await sock.sendMessage(from, { text: '🏓 Pong!' });
-        }
-    });
+    if (body === '!menu') {
+      await sock.sendMessage(from, { text: '📋 Menu Zayla-Bot\n\n1. !ping\n2. !menu\n\nKetik perintah di atas untuk mencoba.' });
+    }
+  });
 }
 
-startZaylaBot();
+startBot();
+
+// Server web biar tetap hidup
+app.get("/", (req, res) => {
+  res.send("🤖 Zayla-Bot is Running!");
+});
+
+app.listen(PORT, () => {
+  console.log(`🌐 Server running at http://localhost:${PORT}`);
+});
