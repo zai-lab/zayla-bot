@@ -1,60 +1,55 @@
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const { Boom } = require('@hapi/boom');
+const pino = require('pino');
 const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const { default: makeWASocket, useSingleFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require("@whiskeysockets/baileys");
-const { Boom } = require("@hapi/boom");
-const qrcode = require("qrcode-terminal");
-const fs = require('fs');
+// Jalankan Express agar bot tetap hidup
+app.get('/', (req, res) => res.send('🤖 Zayla-Bot is running'));
+app.listen(PORT, () => console.log(`🌐 Server running at http://localhost:${PORT}`));
 
-const { state, saveState } = useSingleFileAuthState('./auth_info.json');
+async function startZayla() {
+  const { state, saveCreds } = await useMultiFileAuthState('./auth_info_baileys');
+  const { version } = await fetchLatestBaileysVersion();
+  const sock = makeWASocket({
+    version,
+    auth: state,
+    printQRInTerminal: true,
+    logger: pino({ level: 'silent' }),
+  });
 
-async function startBot() {
-    const { version, isLatest } = await fetchLatestBaileysVersion();
-    const sock = makeWASocket({
-        version,
-        auth: state,
-        printQRInTerminal: true, // Tampilkan QR di terminal
-    });
+  sock.ev.on('creds.update', saveCreds);
 
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update;
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect } = update;
 
-        if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('Koneksi terputus. Reconnect:', shouldReconnect);
-            if (shouldReconnect) startBot();
-        } else if (connection === 'open') {
-            console.log('✅ Bot WhatsApp Zayla telah online!');
-        }
-    });
+    if (connection === 'close') {
+      const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+      console.log('❌ Bot disconnected. Reconnecting:', shouldReconnect);
+      if (shouldReconnect) startZayla();
+    }
 
-    sock.ev.on('creds.update', saveState);
+    if (connection === 'open') {
+      console.log('✅ Zayla-Bot is now connected to WhatsApp!');
+    }
+  });
 
-    sock.ev.on('messages.upsert', async ({ messages, type }) => {
-        const msg = messages[0];
-        if (!msg.message || msg.key.fromMe) return;
+  sock.ev.on('messages.upsert', async ({ messages }) => {
+    const msg = messages[0];
+    if (!msg.message || msg.key.fromMe) return;
 
-        const from = msg.key.remoteJid;
-        const text = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
+    const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+    const sender = msg.key.remoteJid;
 
-        if (text.toLowerCase() === '.ping') {
-            await sock.sendMessage(from, { text: '🏓 Pong dari Zayla!' });
-        } else if (text.toLowerCase().startsWith('.quote')) {
-            const quotes = [
-                "Jangan menyerah, hal besar butuh waktu 🍃",
-                "Sukses adalah hasil dari usaha yang terus-menerus 💡",
-                "Hari ini sulit, tapi besok lebih cerah ☀️"
-            ];
-            const quote = quotes[Math.floor(Math.random() * quotes.length)];
-            await sock.sendMessage(from, { text: `📜 Quote:\n${quote}` });
-        }
-    });
+    if (text.toLowerCase() === '.ping') {
+      await sock.sendMessage(sender, { text: '🏓 Pong dari Zayla-Bot!' });
+    }
+
+    if (text.toLowerCase() === '.menu') {
+      await sock.sendMessage(sender, { text: '📋 Menu Zayla-Bot:\n\n1. .ping\n2. .quote\n3. .menu\n\nPowered by ZAI ⚡' });
+    }
+  });
 }
 
-// Jalankan bot
-startBot().catch(err => console.error('❌ Error:', err));
-
-// Server express untuk jaga agar bot tetap hidup
-app.get('/', (req, res) => res.send('🤖 Zayla-Bot aktif'));
-app.listen(PORT, () => console.log(`🌐 Server berjalan di port ${PORT}`));
+startZayla();
