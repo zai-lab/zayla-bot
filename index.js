@@ -8,19 +8,15 @@ const { Boom } = require('@hapi/boom');
 const pino = require('pino');
 const express = require('express');
 const qrcode = require('qrcode-terminal');
-const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// Web server biar Zeabur gak auto-mati
 app.get('/', (req, res) => res.send('🤖 Zayla-Bot is running'));
 app.listen(PORT, () => console.log(`🌐 Server running at http://localhost:${PORT}`));
 
 async function startZayla() {
-  if (!fs.existsSync('./auth_info_baileys')) {
-    fs.mkdirSync('./auth_info_baileys');
-  }
-
   const { state, saveCreds } = await useMultiFileAuthState('./auth_info_baileys');
   const { version } = await fetchLatestBaileysVersion();
 
@@ -36,8 +32,11 @@ async function startZayla() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      console.log('📲 Scan QR berikut untuk login:');
+      console.log('📲 Scan QR berikut untuk login (tampilan terminal):');
       qrcode.generate(qr, { small: true });
+
+      console.log('\n🔗 Atau buka link ini di browser HP & scan pakai WhatsApp:');
+      console.log(`👉 https://wa.me/scan?qr=${qr}\n`);
     }
 
     if (connection === 'close') {
