@@ -1,0 +1,13 @@
+{
+  "name": "zayla-bot",
+  "version": "1.1.0.0",
+  "description": "Zayla - WhatsApp Bot | Powered by ZAI | Diawasi oleh Zunkee",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.0",
+    "pino": "^8.0.0"
+  }
+}
