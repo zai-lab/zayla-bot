@@ -1,17 +1,18 @@
 {
   "name": "zayla-bot",
-  "version": "1.0.0",
-  "description": "Bot WhatsApp Zayla menggunakan Baileys",
+  "version": "1.1.0.0",
+  "description": "Zayla WhatsApp Bot - Powered by ZAI, diawasi dan dinaungi oleh Zunkee",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
-  "keywords": ["whatsapp", "bot", "baileys"],
-  "author": "ZAI LAB",
+  "keywords": ["whatsapp", "bot", "zayla", "zunkee", "express"],
+  "author": "Zai Lab",
   "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.5.0",
     "@hapi/boom": "^10.0.1",
+    "express": "^4.18.2",
     "qrcode-terminal": "^0.12.0"
   }
 }
