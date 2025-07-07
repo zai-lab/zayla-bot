@@ -6,13 +6,14 @@
   "scripts": {
     "start": "node index.js"
   },
-  "keywords": ["whatsapp", "bot", "zayla", "zunkee", "express"],
+  "keywords": ["whatsapp", "bot", "zayla", "zunkee", "baileys", "express"],
   "author": "Zai Lab",
   "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.5.0",
     "@hapi/boom": "^10.0.1",
     "express": "^4.18.2",
-    "qrcode-terminal": "^0.12.0"
+    "qrcode-terminal": "^0.12.0",
+    "pino": "^8.0.0"
   }
 }
