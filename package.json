@@ -1,17 +1,17 @@
 {
   "name": "zayla-bot",
-  "version": "1.1.0.0",
-  "description": "WhatsApp Bot menggunakan Baileys",
+  "version": "1.0.0",
+  "description": "Bot WhatsApp Zayla menggunakan Baileys",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
+  "keywords": ["whatsapp", "bot", "baileys"],
+  "author": "ZAI LAB",
+  "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.5.0",
-    "qrcode-terminal": "^0.12.0",
-    "express": "^4.18.2"
-  },
-  "engines": {
-    "node": ">=16.0.0"
+    "@hapi/boom": "^10.0.1",
+    "qrcode-terminal": "^0.12.0"
   }
 }
