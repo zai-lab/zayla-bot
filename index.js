@@ -4,17 +4,47 @@ const {
   DisconnectReason,
   fetchLatestBaileysVersion
 } = require('@whiskeysockets/baileys');
+
 const { Boom } = require('@hapi/boom');
 const pino = require('pino');
 const express = require('express');
-const qrcode = require('qrcode-terminal');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Web server biar Zeabur gak auto-mati
-app.get('/', (req, res) => res.send('🤖 Zayla-Bot is running'));
-app.listen(PORT, () => console.log(`🌐 Server running at http://localhost:${PORT}`));
+let currentQR = ''; // Untuk menyimpan QR terbaru
+
+// Halaman utama
+app.get('/', (req, res) => {
+  res.send(`
+    <h2>🤖 Zayla-Bot Aktif</h2>
+    <p>Scan QR di: <a href="/qr" target="_blank">Klik di sini untuk scan QR</a></p>
+  `);
+});
+
+// Halaman QR
+app.get('/qr', (req, res) => {
+  if (!currentQR) {
+    return res.send('<h2>⏳ QR belum tersedia. Tunggu beberapa detik...</h2>');
+  }
+
+  const qrImg = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(currentQR)}&size=300x300`;
+
+  res.send(`
+    <html>
+      <body style="font-family: sans-serif; text-align: center; padding-top: 50px;">
+        <h2>📲 Scan QR WhatsApp</h2>
+        <img src="${qrImg}" alt="QR Code WhatsApp" />
+        <p>⏱ QR berlaku singkat. Refresh halaman ini jika expired.</p>
+      </body>
+    </html>
+  `);
+});
+
+// Jalankan web server
+app.listen(PORT, () => {
+  console.log(`🌐 Server aktif di http://localhost:${PORT}`);
+});
 
 async function startZayla() {
   const { state, saveCreds } = await useMultiFileAuthState('./auth_info_baileys');
@@ -23,7 +53,7 @@ async function startZayla() {
   const sock = makeWASocket({
     version,
     auth: state,
-    logger: pino({ level: 'silent' }),
+    logger: pino({ level: 'silent' })
   });
 
   sock.ev.on('creds.update', saveCreds);
@@ -32,21 +62,19 @@ async function startZayla() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      console.log('📲 Scan QR berikut untuk login (tampilan terminal):');
-      qrcode.generate(qr, { small: true });
-
-      console.log('\n🔗 Atau buka link ini di browser HP & scan pakai WhatsApp:');
-      console.log(`👉 https://wa.me/scan?qr=${qr}\n`);
+      currentQR = qr;
+      console.log('📲 QR baru tersedia! Scan di /qr');
     }
 
     if (connection === 'close') {
       const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log('❌ Bot terputus. Menghubungkan ulang:', shouldReconnect);
+      console.log('❌ Terputus. Coba koneksi ulang:', shouldReconnect);
       if (shouldReconnect) startZayla();
     }
 
     if (connection === 'open') {
-      console.log('✅ Zayla-Bot berhasil terhubung ke WhatsApp!');
+      currentQR = ''; // kosongkan QR setelah login
+      console.log('✅ Zayla-Bot berhasil tersambung!');
     }
   });
 
