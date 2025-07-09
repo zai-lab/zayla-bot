@@ -1,19 +1,41 @@
 {
   "name": "zayla-bot",
-  "version": "1.1.0.0",
-  "description": "Zayla WhatsApp Bot - Powered by ZAI, diawasi dan dinaungi oleh Zunkee",
+  "version": "2.3.0.0",
+  "description": "Zayla WhatsApp Bot - Versi terbaru dengan sistem pelanggan, premium, sewa, edukasi, dan fitur grup canggih. Bot ini dikembangkan oleh ZAI Lab dan dinaungi oleh Zunkee.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
-  "keywords": ["whatsapp", "bot", "zayla", "zunkee", "baileys", "express"],
-  "author": "Zai Lab",
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "zayla",
+    "zunkee",
+    "zailab",
+    "baileys",
+    "premium",
+    "auto-reply",
+    "grup-bot",
+    "sewa-bot",
+    "pendidikan",
+    "download",
+    "AI",
+    "fitur-grup",
+    "whatsapp-bot"
+  ],
+  "author": "ZAI Lab",
   "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.5.0",
     "@hapi/boom": "^10.0.1",
     "express": "^4.18.2",
     "qrcode-terminal": "^0.12.0",
-    "pino": "^8.0.0"
+    "pino": "^8.0.0",
+    "moment-timezone": "^0.5.43",
+    "axios": "^1.6.8",
+    "cheerio": "^1.0.0-rc.12",
+    "node-fetch": "^3.3.2",
+    "form-data": "^4.0.0",
+    "fs-extra": "^11.2.0"
   }
 }
