@@ -1,78 +1,73 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { default: makeWASocket, useSingleFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+const P = require('pino');
 const fs = require('fs');
 const path = require('path');
 
-const SESSION_DIR = './session'; // Untuk menyimpan data autentikasi WA
-const BLOCKED_USERS_FILE = './database/blocked.json';
+const { handleCommand } = require('./command');
+const { handleSewa, checkExpiredSewa, checkSpamCall } = require('./sewa');
 
-const client = new Client({
-    authStrategy: new LocalAuth({ dataPath: SESSION_DIR }),
-    puppeteer: { headless: true }
-});
+const { state, saveState } = useSingleFileAuthState('./session/auth_info.json');
 
-// Cek dan buat file block jika belum ada
-if (!fs.existsSync(BLOCKED_USERS_FILE)) {
-    fs.writeFileSync(BLOCKED_USERS_FILE, JSON.stringify([]));
+if (!fs.existsSync('./session')) fs.mkdirSync('./session');
+if (!fs.existsSync('./database')) fs.mkdirSync('./database');
+
+async function startZaylaBot() {
+  const { version } = await fetchLatestBaileysVersion();
+
+  const sock = makeWASocket({
+    version,
+    printQRInTerminal: true,
+    auth: state,
+    logger: P({ level: 'silent' }),
+    browser: ['ZaylaBot', 'Chrome', '1.0']
+  });
+
+  sock.ev.on('creds.update', saveState);
+
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect } = update;
+    if (connection === 'close') {
+      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+      if (shouldReconnect) {
+        startZaylaBot();
+      }
+    } else if (connection === 'open') {
+      console.log('✅ ZaylaBot is connected!');
+      checkExpiredSewa(sock);
+    }
+  });
+
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
+    const msg = messages[0];
+    if (!msg.message || msg.key?.remoteJid === 'status@broadcast') return;
+
+    const sender = msg.key.participant || msg.key.remoteJid;
+    const from = msg.key.remoteJid;
+    const isGroup = from.endsWith('@g.us');
+
+    await checkSpamCall(sock, msg);
+
+    const handledSewa = await handleSewa(sock, msg, from, sender, isGroup);
+    if (handledSewa) return;
+
+    await handleCommand(sock, msg, from, sender, isGroup);
+  });
+
+  sock.ev.on('call', async (call) => {
+    const from = call[0].from;
+    console.log(`⚠️ Blocked call from: ${from}`);
+    await sock.updateBlockStatus(from, 'block');
+
+    let blocked = [];
+    if (fs.existsSync('./database/blocked.json')) {
+      blocked = JSON.parse(fs.readFileSync('./database/blocked.json'));
+    }
+    if (!blocked.includes(from)) {
+      blocked.push(from);
+      fs.writeFileSync('./database/blocked.json', JSON.stringify(blocked));
+    }
+  });
 }
 
-let blockedUsers = JSON.parse(fs.readFileSync(BLOCKED_USERS_FILE));
-
-// 🟢 Ketika bot sudah aktif
-client.on('ready', () => {
-    console.log('✅ Zayla-Bot sudah aktif!');
-});
-
-// ❌ Auto blokir yang spam dan telepon
-client.on('call', async call => {
-    const number = call.from;
-    if (!blockedUsers.includes(number)) {
-        blockedUsers.push(number);
-        fs.writeFileSync(BLOCKED_USERS_FILE, JSON.stringify(blockedUsers));
-        await client.sendMessage(number, '*❌ Anda diblokir karena mencoba menelepon bot.*');
-        await client.blockContact(number);
-    }
-});
-
-client.on('message_create', async msg => {
-    const number = msg.from;
-
-    // Auto blokir spam pribadi
-    if (!msg.from.includes('@g.us') && !msg.fromMe) {
-        const chat = await msg.getChat();
-        if (chat.unreadCount >= 10) {
-            if (!blockedUsers.includes(number)) {
-                blockedUsers.push(number);
-                fs.writeFileSync(BLOCKED_USERS_FILE, JSON.stringify(blockedUsers));
-                await client.sendMessage(number, '*❌ Anda diblokir karena spam ke bot.*');
-                await client.blockContact(number);
-            }
-        }
-    }
-});
-
-// 🧠 Tangkap perintah dan jalankan handler
-client.on('message', async message => {
-    const prefix = '.';
-    if (!message.body.startsWith(prefix)) return;
-
-    const args = message.body.slice(prefix.length).trim().split(/ +/);
-    const command = args.shift().toLowerCase();
-
-    // Path handler berdasarkan perintah
-    const commandPath = path.join(__dirname, 'handlers', `${command}.js`);
-
-    // Jika handler tersedia, jalankan
-    if (fs.existsSync(commandPath)) {
-        try {
-            const handler = require(commandPath);
-            await handler(client, message, args);
-        } catch (err) {
-            console.error(`❌ Error handler ${command}:`, err);
-            await message.reply('⚠️ Maaf, terjadi kesalahan saat memproses perintah.');
-        }
-    } else {
-        await message.reply(`❌ Perintah *.${command}* tidak ditemukan.`);
-    }
-});
-
-client.initialize();
+startZaylaBot();
