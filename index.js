@@ -1,41 +1,70 @@
-// index.js const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys'); const P = require('pino'); const fs = require('fs'); const path = require('path'); const express = require('express'); const { handleCommand } = require('./command'); const { handleSewa, checkExpiredSewa, checkSpamCall, handleReferral } = require('./sewa');
+const {
+  default: makeWASocket,
+  useSingleFileAuthState,
+  DisconnectReason,
+  fetchLatestBaileysVersion,
+} = require('@whiskeysockets/baileys');
+const P = require('pino');
+const fs = require('fs');
+const { Boom } = require('@hapi/boom');
 
-const PORT = process.env.PORT || 3000; const app = express(); app.get('/', (req, res) => res.send('ZaylaBot Aktif!')); app.listen(PORT, () => console.log(🌐 Web Server aktif di http://localhost:${PORT}));
+const { handleCommand } = require('./command');
+const { handleSewa, checkExpiredSewa } = require('./sewa');
+const { isBlocked, blockUser } = require('./spam');
 
-async function startZaylaBot() { const { state, saveCreds } = await useMultiFileAuthState('./sessions'); const { version } = await fetchLatestBaileysVersion(); const sock = makeWASocket({ version, printQRInTerminal: true, auth: state, logger: P({ level: 'silent' }), browser: ['ZaylaBot', 'Zunkee', '1.0'] });
+const { state, saveState } = useSingleFileAuthState('./sessions/auth_info.json');
 
-sock.ev.on('creds.update', saveCreds);
+async function startZaylaBot() {
+  const { version } = await fetchLatestBaileysVersion();
 
-sock.ev.on('connection.update', (update) => { const { connection, lastDisconnect } = update; if (connection === 'close') { const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut; if (shouldReconnect) startZaylaBot(); } else if (connection === 'open') { console.log('✅ ZaylaBot tersambung!'); checkExpiredSewa(sock); } });
+  const sock = makeWASocket({
+    version,
+    printQRInTerminal: true,
+    auth: state,
+    logger: P({ level: 'silent' }),
+    browser: ['ZaylaBot', 'Chrome', '1.0.0'],
+  });
 
-sock.ev.on('messages.upsert', async ({ messages, type }) => { if (type !== 'notify') return; const msg = messages[0]; if (!msg.message || msg.key?.remoteJid === 'status@broadcast') return;
+  sock.ev.on('creds.update', saveState);
 
-const sender = msg.key.participant || msg.key.remoteJid;
-const from = msg.key.remoteJid;
-const isGroup = from.endsWith('@g.us');
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect } = update;
+    if (connection === 'close') {
+      const shouldReconnect =
+        lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+      if (shouldReconnect) {
+        startZaylaBot();
+      }
+    } else if (connection === 'open') {
+      console.log('✅ Bot aktif! Siap melayani pengguna.');
+      checkExpiredSewa(sock);
+    }
+  });
 
-await checkSpamCall(sock, msg);
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (type !== 'notify') return;
+    const msg = messages[0];
+    if (!msg.message || msg.key.remoteJid === 'status@broadcast') return;
 
-const handledSewa = await handleSewa(sock, msg, from, sender, isGroup);
-if (handledSewa) return;
+    const from = msg.key.remoteJid;
+    const sender = msg.key.participant || from;
+    const isGroup = from.endsWith('@g.us');
 
-await handleCommand(sock, msg, from, sender, isGroup);
+    if (await isBlocked(sock, msg)) return;
 
-});
+    if (await handleSewa(sock, msg, from, sender, isGroup)) return;
 
-sock.ev.on('call', async (call) => { const from = call[0].from; console.log(⚠️  Diblokir otomatis: Panggilan dari ${from}); await sock.updateBlockStatus(from, 'block');
+    await handleCommand(sock, msg, from, sender, isGroup);
+  });
 
-let blocked = [];
-if (fs.existsSync('./database/blocked.json')) {
-  blocked = JSON.parse(fs.readFileSync('./database/blocked.json'));
+  sock.ev.on('call', async (callData) => {
+    const from = callData[0]?.from;
+    if (from) {
+      await sock.updateBlockStatus(from, 'block');
+      await blockUser(from);
+      console.log(`⚠️ Diblokir karena melakukan panggilan: ${from}`);
+    }
+  });
 }
-if (!blocked.includes(from)) {
-  blocked.push(from);
-  fs.writeFileSync('./database/blocked.json', JSON.stringify(blocked));
-}
-
-}); }
 
 startZaylaBot();
-
-                                     
