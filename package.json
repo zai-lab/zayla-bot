@@ -1,31 +1,25 @@
 {
   "name": "zayla-bot",
   "version": "2.3.0.0",
-  "description": "ZaylaBot adalah bot WhatsApp pintar yang dibuat menggunakan Baileys library. Bot ini dapat digunakan untuk layanan publik, hiburan, dan sistem sewa otomatis dengan identitas pelanggan, sistem referral, dan pengawasan penuh oleh pengelola. Dilengkapi dengan fitur perintah interaktif, antispam, autoblock telepon, serta sistem pembelian premium Zrium dan biaya operasional. Dibangun dan diawasi langsung oleh Zunkee dengan antarmuka sederhana, cepat, dan ringan hanya dengan konsumsi memori ±300MB.",
+  "description": "🤖 ZaylaBot adalah asisten WhatsApp cerdas untuk kebutuhan manajemen grup, sistem sewa otomatis, pembelian Zrium (fitur premium), anti spam, auto blokir panggilan, dan lainnya. Dirancang oleh ZaiLab dan dikelola oleh Zunkee.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "keywords": [
-    "whatsapp",
-    "bot",
-    "zaylabot",
+    "whatsapp-bot",
     "baileys",
-    "wa-bot",
-    "premium",
-    "zrium",
+    "zayla",
     "zunkee",
-    "autoblock",
-    "interactive",
-    "zeabur"
+    "auto-sewa",
+    "premium-wa-bot"
   ],
-  "author": "Zai Lab | Zunkee Project",
+  "author": "ZaiLab | Zunkee Network",
   "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "^6.4.0",
     "@hapi/boom": "^10.0.1",
-    "express": "^4.18.2",
-    "qrcode-terminal": "^0.12.0",
-    "pino": "^8.0.0"
+    "pino": "^8.0.0",
+    "fs": "^0.0.1-security"
   }
 }
