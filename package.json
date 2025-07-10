@@ -1,32 +1,18 @@
 {
   "name": "zayla-bot",
   "version": "2.3.0",
-  "description": "ZaylaBot adalah bot WhatsApp serbaguna berbasis Baileys, dirancang untuk membantu pengguna dengan berbagai fitur otomatisasi seperti sistem sewa/beli premium Zrium, deteksi spam call, manajemen grup, dan perintah harian lainnya. Bot ini dikembangkan dan diawasi langsung oleh Zunkee.",
+  "description": "Zayla WhatsApp Bot — bot WhatsApp pintar serba bisa dengan fitur sewa, blokir otomatis, sistem pengawas, dan pemindaian QR via web (Zeabur QR). Dikembangkan oleh ZAI dan dinaungi oleh Zunkee.",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
-  "keywords": [
-    "whatsapp",
-    "bot",
-    "zayla",
-    "baileys",
-    "zrium",
-    "zunkee",
-    "whatsapp-bot",
-    "premium-bot",
-    "chatbot",
-    "automation"
-  ],
-  "author": "Zai Lab",
+  "keywords": ["whatsapp", "bot", "zayla", "zunkee", "baileys", "sewa", "qr", "zeabur"],
+  "author": "ZAI Lab - Zunkee",
   "license": "MIT",
   "dependencies": {
     "@whiskeysockets/baileys": "6.4.0",
-    "pino": "^8.0.0",
-    "qrcode-terminal": "^0.12.0",
-    "@hapi/boom": "^10.0.1",
     "express": "^4.18.2",
-    "moment": "^2.29.4",
-    "fs-extra": "^11.1.1"
+    "pino": "^8.0.0",
+    "qrcode-terminal": "^0.12.0"
   }
 }
