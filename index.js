@@ -1,88 +1,71 @@
-const {
-  default: makeWASocket,
-  useSingleFileAuthState,
-  fetchLatestBaileysVersion,
-  DisconnectReason
-} = require('baileys');
-const P = require('pino');
-const fs = require('fs');
+const { default: makeWASocket, useSingleFileAuthState, DisconnectReason, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys')
+const fs = require('fs')
+const P = require('pino')
+const express = require('express')
+const path = require('path')
+const app = express()
 
-// pastikan kamu sudah membuat folder `sessions/` di root
-const { state, saveState } = useSingleFileAuthState('./sessions/auth_info.json');
+// Import fitur bot
+const { handleCommand } = require('./command')
+const { handleSewa, checkExpiredSewa, checkSpamCall } = require('./sewa')
 
-async function startZaylaBot() {
-  // ambil versi WA terbaru yang didukung
-  const { version, isLatest } = await fetchLatestBaileysVersion();
-  console.log(`Using WA v${version.join('.')} (latest: ${isLatest})`);
+// Session Auth
+const { state, saveState } = useSingleFileAuthState('./sessions/auth_info.json')
 
+// WA Init
+async function startBot() {
+  const { version } = await fetchLatestBaileysVersion()
   const sock = makeWASocket({
     version,
+    printQRInTerminal: false,
     auth: state,
-    printQRInTerminal: true,
     logger: P({ level: 'silent' }),
     browser: ['ZaylaBot', 'Chrome', '1.0']
-  });
+  })
 
-  // simpan sesi kalau berubah
-  sock.ev.on('creds.update', saveState);
+  sock.ev.on('creds.update', saveState)
 
-  // reconnect & status
-  sock.ev.on('connection.update', ({ connection, lastDisconnect }) => {
+  // Tampilkan QR via Web Zeabur
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect, qr } = update
+    if (qr) qrCode = qr // Simpan QR di variable global
     if (connection === 'close') {
-      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log('❌ disconnected, reconnect?', shouldReconnect);
-      if (shouldReconnect) startZaylaBot();
+      if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) startBot()
+    } else if (connection === 'open') {
+      console.log('✅ Bot connected to WhatsApp')
+      checkExpiredSewa(sock)
     }
-    if (connection === 'open') {
-      console.log('✅ ZaylaBot is connected!');
-    }
-  });
+  })
 
-  // handle incoming messages
+  // Handle pesan masuk
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') return;
-    const msg = messages[0];
-    if (!msg.message || msg.key.remoteJid === 'status@broadcast') return;
+    if (type !== 'notify') return
+    const msg = messages[0]
+    if (!msg.message || msg.key?.remoteJid === 'status@broadcast') return
+    const from = msg.key.remoteJid
+    const sender = msg.key.participant || from
+    const isGroup = from.endsWith('@g.us')
 
-    const from = msg.key.remoteJid;
-    const text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+    await checkSpamCall(sock, msg)
+    if (await handleSewa(sock, msg, from, sender, isGroup)) return
+    await handleCommand(sock, msg, from, sender, isGroup)
+  })
 
-    // contoh perintah dasar
-    if (text === '.ping') {
-      await sock.sendMessage(from, { text: '🏓 Pong dari ZaylaBot!' });
-    }
-    else if (text === '.menu') {
-      await sock.sendMessage(from, {
-        text: [
-          '📋 *Menu ZaylaBot*',
-          '1. .ping — Tes bot',
-          '2. .menu — Tampilkan menu',
-          '',
-          'Bot v2.3.0 ⚡️',
-          '_Powered by ZAI Lab_'
-        ].join('\n')
-      });
-    }
-    // TODO: import & call your full command handler here
-  });
-
-  // auto-block kalau ditelepon
-  sock.ev.on('call', async (callEvents) => {
-    const caller = callEvents[0]?.from;
-    if (caller) {
-      console.log(`📵 Blocking call from ${caller}`);
-      await sock.updateBlockStatus(caller, 'block');
-
-      // simpan daftar blocked jika perlu
-      const dbPath = './blocked.json';
-      let list = [];
-      if (fs.existsSync(dbPath)) list = JSON.parse(fs.readFileSync(dbPath));
-      if (!list.includes(caller)) {
-        list.push(caller);
-        fs.writeFileSync(dbPath, JSON.stringify(list, null, 2));
-      }
-    }
-  });
+  // Auto block call
+  sock.ev.on('call', async (call) => {
+    const caller = call[0]?.from
+    console.log('⚠️ Blocked call from:', caller)
+    await sock.updateBlockStatus(caller, 'block')
+  })
 }
 
-startZaylaBot();
+startBot()
+
+// Web QR Code Viewer (diakses dari Zeabur domain)
+let qrCode = ''
+app.get('/', (req, res) => {
+  if (!qrCode) return res.send('✅ Bot sudah login!')
+  res.send(`<pre style="font-size:20px;">${qrCode}</pre>`)
+})
+const PORT = process.env.PORT || 3000
+app.listen(PORT, () => console.log(`🌐 QR diakses: http://localhost:${PORT}`))
